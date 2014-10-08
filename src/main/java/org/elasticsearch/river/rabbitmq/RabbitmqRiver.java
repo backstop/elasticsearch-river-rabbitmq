@@ -362,18 +362,20 @@ public class RabbitmqRiver extends AbstractRiverComponent implements River {
                         deliveryTags.add(task.getEnvelope().getDeliveryTag());
 
                         BulkRequestBuilder bulkRequestBuilder = client.prepareBulk().setReplicationType(replicationType);
-                        if (bulkRequestBuilder.numberOfActions() < bulkSize) {
+                        int currentBulkSize = 1;
+                        if (currentBulkSize < bulkSize) {
                             // try and spin some more of those without timeout, so we have a bigger bulk (bounded by the bulk size)
                             try {
                                 while ((task = consumer.nextDelivery(bulkTimeout.millis())) != null) {
                                     try {
                                         fullBulkRequestStream.write(task.getBody());
+                                        currentBulkSize++;
                                     } catch (IOException e) {
                                         logger.error("Error while caching bulk action body", e);
                                     }
                                     deliveryTags.add(task.getEnvelope().getDeliveryTag());
 
-                                    if (bulkRequestBuilder.numberOfActions() >= bulkSize) {
+                                    if (currentBulkSize >= bulkSize) {
                                         break;
                                     }
                                 }
