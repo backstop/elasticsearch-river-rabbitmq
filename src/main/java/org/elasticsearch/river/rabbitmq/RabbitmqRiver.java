@@ -353,41 +353,34 @@ public class RabbitmqRiver extends AbstractRiverComponent implements River {
                     if (task != null && task.getBody() != null) {
                         final List<Long> deliveryTags = Lists.newArrayList();
 
-                        BulkRequestBuilder bulkRequestBuilder = client.prepareBulk().setReplicationType(replicationType);
-
+                        ByteArrayOutputStream fullBulkRequestStream = new ByteArrayOutputStream();
                         try {
-                            processBody(task.getBody(), bulkRequestBuilder);
-                        } catch (Exception e) {
-                            logger.warn("failed to parse request for delivery tag [{}], ack'ing...", e, task.getEnvelope().getDeliveryTag());
-                            try {
-                                channel.basicAck(task.getEnvelope().getDeliveryTag(), false);
-                            } catch (IOException e1) {
-                                logger.warn("failed to ack [{}]", e1, task.getEnvelope().getDeliveryTag());
-                            }
-                            continue;
+                            fullBulkRequestStream.write(task.getBody());
+                        } catch (IOException e) {
+                            logger.error("Error while caching bulk action body", e);
                         }
-
                         deliveryTags.add(task.getEnvelope().getDeliveryTag());
 
-                        if (bulkRequestBuilder.numberOfActions() < bulkSize) {
+                        BulkRequestBuilder bulkRequestBuilder = client.prepareBulk().setReplicationType(replicationType);
+                        int currentBulkSize = 1;
+                        if (currentBulkSize < bulkSize) {
                             // try and spin some more of those without timeout, so we have a bigger bulk (bounded by the bulk size)
                             try {
                                 while ((task = consumer.nextDelivery(bulkTimeout.millis())) != null) {
                                     try {
-                                        processBody(task.getBody(), bulkRequestBuilder);
-                                        deliveryTags.add(task.getEnvelope().getDeliveryTag());
-                                    } catch (Throwable e) {
-                                        logger.warn("failed to parse request for delivery tag [{}], ack'ing...", e, task.getEnvelope().getDeliveryTag());
-                                        try {
-                                            channel.basicAck(task.getEnvelope().getDeliveryTag(), false);
-                                        } catch (Exception e1) {
-                                            logger.warn("failed to ack on failure [{}]", e1, task.getEnvelope().getDeliveryTag());
-                                        }
+                                        fullBulkRequestStream.write(task.getBody());
+                                        currentBulkSize++;
+                                    } catch (IOException e) {
+                                        logger.error("Error while caching bulk action body", e);
                                     }
-                                    if (bulkRequestBuilder.numberOfActions() >= bulkSize) {
+                                    deliveryTags.add(task.getEnvelope().getDeliveryTag());
+
+                                    if (currentBulkSize >= bulkSize) {
                                         break;
                                     }
                                 }
+
+                                processBody(fullBulkRequestStream.toByteArray(), bulkRequestBuilder);
                             } catch (InterruptedException e) {
                                 if (closed) {
                                     break;
@@ -400,6 +393,8 @@ public class RabbitmqRiver extends AbstractRiverComponent implements River {
                                 }
                                 cleanup(0, "failed to get message");
                                 break;
+                            } catch (Exception e) {
+                                logger.error("Failed to process bulk actions in script.");
                             }
                         }
 
