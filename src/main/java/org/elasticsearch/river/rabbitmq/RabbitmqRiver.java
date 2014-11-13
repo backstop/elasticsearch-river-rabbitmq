@@ -385,6 +385,7 @@ public class RabbitmqRiver extends AbstractRiverComponent implements River {
                                 if (closed) {
                                     break;
                                 }
+                                logger.warn("Caught InterruptedException in script processing", e);
                             } catch (ShutdownSignalException sse) {
                                 logger.warn("Received a shutdown signal! initiatedByApplication: [{}], hard error: [{}]", sse,
                                         sse.isInitiatedByApplication(), sse.isHardError());
@@ -398,9 +399,7 @@ public class RabbitmqRiver extends AbstractRiverComponent implements River {
                             }
                         }
 
-                        if (logger.isTraceEnabled()) {
-                            logger.trace("executing bulk with [{}] actions", bulkRequestBuilder.numberOfActions());
-                        }
+                        logger.info("executing bulk with [{}] actions", bulkRequestBuilder.numberOfActions());
 
                         if (ordered) {
                             try {
@@ -503,12 +502,16 @@ public class RabbitmqRiver extends AbstractRiverComponent implements River {
                 if (newBodyStr == null) return ;
                 body =  newBodyStr.getBytes();
             }
+            logger.info("Finished processing bulk script");
 
             // second, the "doc per doc" script
             if (script != null) {
                 processBodyPerLine(body, bulkRequestBuilder);
+                logger.info("Finished processing doc per doc script");
             } else {
+                logger.info("No doc per doc script, generating BulkRequestBuilder");
                 bulkRequestBuilder.add(body, 0, body.length, false);
+                logger.info("BulkRequestBuilder generated");
             }
         }
 
