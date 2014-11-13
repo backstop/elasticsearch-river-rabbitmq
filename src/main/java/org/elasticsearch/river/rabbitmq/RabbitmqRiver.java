@@ -492,14 +492,22 @@ public class RabbitmqRiver extends AbstractRiverComponent implements River {
         }
 
         private void processBody(byte[] body, BulkRequestBuilder bulkRequestBuilder) throws Exception {
-            if (body == null) return;
+            logger.info("Starting processing bulk script");
+            if (body == null) {
+                logger.info("Bulk body null - returning");
+                return;
+            }
+
 
             // first, the "full bulk" script
             if (bulkScript != null) {
                 String bodyStr = new String(body);
                 bulkScript.setNextVar("body", bodyStr);
                 String newBodyStr = (String) bulkScript.run();
-                if (newBodyStr == null) return ;
+                if (newBodyStr == null) {
+                    logger.info("New bulk body null - returning");
+                    return ;
+                }
                 body =  newBodyStr.getBytes();
             }
             logger.info("Finished processing bulk script");
