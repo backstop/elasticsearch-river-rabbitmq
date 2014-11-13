@@ -508,10 +508,10 @@ public class RabbitmqRiver extends AbstractRiverComponent implements River {
                     logger.info("New bulk body null - returning");
                     return ;
                 } else {
-                    logger.info("Finished processing bulk body, length=", newBodyStr.length());
+                    logger.info("Finished processing bulk body, length=" + newBodyStr.length());
                 }
                 body = newBodyStr.getBytes();
-                logger.info("Got bytes from string body, bytes length=", body.length);
+                logger.info("Got bytes from string body, bytes length=" + body.length);
             }
             logger.info("Finished processing bulk script");
 
